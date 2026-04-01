@@ -882,10 +882,30 @@ def main():
     print("=" * 50)
     
     # Start web server in background
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.create_task(web_server())
-    
+async def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("cancel", cancel_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_msg))
+    app.add_handler(CallbackQueryHandler(btn_handler))
+
+    print("=" * 50)
+    print("🔥 PREMIUM BOMBER Started")
+    print(f"📊 Loaded {len(APIS)} APIs from api.json")
+    print(f"👑 Owner ID: {OWNER_ID}")
+    print("=" * 50)
+
+    # start web server
+    asyncio.create_task(web_server())
+
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+    await app.updater.idle()
+
+if __name__ == "__main__":
+    asyncio.run(main())
     # Run bot
     app.run_polling(drop_pending_updates=True)
 
