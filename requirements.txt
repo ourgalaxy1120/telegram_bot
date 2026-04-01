@@ -4,4 +4,3 @@ flask
 aiohttp
 urllib3==1.26.16
 setuptools
-pkg_resources
