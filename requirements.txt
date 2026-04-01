@@ -3,3 +3,4 @@ requests
 flask
 aiohttp
 standard-imghdr
+imghdr
