@@ -8,14 +8,13 @@ import os
 import json
 import logging
 from datetime import datetime, timedelta
+
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters, CallbackQueryHandler
 from aiohttp import web
 
-# =========================================
-# CONFIGURATION
-# =========================================
-BOT_TOKEN = "8016499618:AAFuMAsws27GBEnOGpufm1vI4UeBfE7yAf4" 
+# ========================= CONFIG =========================
+BOT_TOKEN = "8016499618:AAFuMAsws27GBEnOGpufm1vI4UeBfE7yAf4"
 OWNER_ID = 5297630438
 PORT = int(os.environ.get("PORT", 8080))
 
@@ -24,26 +23,20 @@ WELCOME_IMAGE = "https://i.postimg.cc/nczX6L6f/file-000000008f987230882c6568d09e
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# =========================================
-# LOAD APIS
-# =========================================
+# ========================= LOAD APIS =========================
 def load_apis():
     try:
         with open('api.json', 'r') as f:
             apis = json.load(f)
-            logger.info(f"Loaded {len(apis)} APIs")
+            logger.info(f"Loaded {len(apis)} APIs from api.json")
             return apis
     except Exception as e:
-        logger.error(f"api.json error: {e}")
+        logger.error(f"api.json load failed: {e}")
         return []
 
 APIS = load_apis()
 
-DURATION_OPTIONS = {"1":1,"5":5,"15":15,"30":30,"60":60,"120":120,"240":240,"480":480}
-
-# =========================================
-# DATABASE (simplified for now)
-# =========================================
+# ========================= DATABASE (Minimal) =========================
 class Database:
     def __init__(self):
         self.conn = sqlite3.connect('fusion_premium.db', check_same_thread=False)
@@ -52,12 +45,11 @@ class Database:
 
     def create_tables(self):
         c = self.conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, premium_expiry TEXT, protected_number TEXT)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS redeem_codes (code TEXT PRIMARY KEY, days INTEGER, is_used INTEGER DEFAULT 0)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS users 
+                    (user_id INTEGER PRIMARY KEY, premium_expiry TEXT, protected_number TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS redeem_codes 
+                    (code TEXT PRIMARY KEY, days INTEGER, is_used INTEGER DEFAULT 0)''')
         self.conn.commit()
-
-    # Add your other DB methods here (is_premium, add_premium, protect, etc.)
-    # For quick fix, I'm keeping minimal. You can add full class later.
 
     def add_user(self, user_id):
         c = self.conn.cursor()
@@ -65,16 +57,14 @@ class Database:
         self.conn.commit()
 
     def is_premium(self, user_id):
-        if user_id == OWNER_ID: return True
-        # Add full logic if needed
-        return True  # temporary - change later
+        return True  # Change to full logic later
 
     def set_attack_data(self, user_id, phone):
-        self.temp_attack_data[user_id] = {'phone': phone, 'timestamp': time.time()}
+        self.temp_attack_data[user_id] = {'phone': phone, 'ts': time.time()}
 
     def get_attack_data(self, user_id):
         data = self.temp_attack_data.get(user_id)
-        if data and time.time() - data['timestamp'] < 300:
+        if data and time.time() - data['ts'] < 300:
             return data['phone']
         return None
 
@@ -83,9 +73,7 @@ class Database:
 
 db = Database()
 
-# =========================================
-# ATTACK MANAGER (minimal for fix)
-# =========================================
+# ========================= ATTACK MANAGER =========================
 class AttackManager:
     def __init__(self):
         self.active_attacks = {}
@@ -94,53 +82,46 @@ class AttackManager:
         if user_id in self.active_attacks:
             return False
         self.active_attacks[user_id] = {"phone": phone, "running": True}
-        # Add your full attack logic here later
-        logger.info(f"Attack started on {phone} for {duration} min")
-        return True
-
-    async def stop_attack(self, user_id):
-        self.active_attacks.pop(user_id, None)
+        logger.info(f"Attack started on {phone} for {duration} minutes")
         return True
 
 manager = AttackManager()
 
-# =========================================
-# KEYBOARDS
-# =========================================
-def main_kb(user_id):
-    kb = [[KeyboardButton("🚀 Call"), KeyboardButton("📊 Status")],
-          [KeyboardButton("👤 Account"), KeyboardButton("❓ Help")]]
-    return ReplyKeyboardMarkup(kb, resize_keyboard=True)
+# ========================= KEYBOARDS =========================
+def main_kb():
+    return ReplyKeyboardMarkup([
+        [KeyboardButton("🚀 Call"), KeyboardButton("📊 Status")],
+        [KeyboardButton("👤 Account"), KeyboardButton("❓ Help")]
+    ], resize_keyboard=True)
 
 def duration_kb():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("1 Min", callback_data="dur_1"), InlineKeyboardButton("5 Min", callback_data="dur_5")],
-        [InlineKeyboardButton("❌ Cancel", callback_data="cancel_attack")]
+        [InlineKeyboardButton("5 Min", callback_data="dur_5")],
+        [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
     ])
 
-# =========================================
-# HANDLERS
-# =========================================
+# ========================= HANDLERS =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     db.add_user(user_id)
-    await update.message.reply_photo(WELCOME_IMAGE, caption="👋 Welcome to Premium Bomber!", reply_markup=main_kb(user_id))
+    await update.message.reply_photo(WELCOME_IMAGE, caption="👋 Welcome to Premium Bomber!", reply_markup=main_kb())
 
 async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
     text = update.message.text
+    user_id = update.effective_user.id
 
     if text == "🚀 Call":
-        await update.message.reply_text("📞 Enter 10 digit number:")
+        await update.message.reply_text("📞 Enter 10-digit phone number:")
         context.user_data['waiting_number'] = True
 
     elif context.user_data.get('waiting_number') and len(text) == 10 and text.isdigit():
-        context.user_data['waiting_number'] = False
+        context.user_data.pop('waiting_number', None)
         db.set_attack_data(user_id, text)
-        await update.message.reply_text(f"Target: {text}\nSelect duration:", reply_markup=duration_kb())
+        await update.message.reply_text(f"Target: `{text}`\nSelect duration:", reply_markup=duration_kb(), parse_mode="Markdown")
 
     elif text == "📊 Status":
-        await update.message.reply_text("No active attack." if user_id not in manager.active_attacks else "Attack Running!")
+        msg = "🔥 Attack Running!" if user_id in manager.active_attacks else "💤 No active attack"
+        await update.message.reply_text(msg)
 
 async def btn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -152,20 +133,15 @@ async def btn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         phone = db.get_attack_data(uid)
         if phone:
             success = await manager.start_attack(uid, phone, 5)
-            if success:
-                await query.edit_message_text(f"🚀 Attack Started on {phone}!")
-            else:
-                await query.edit_message_text("Failed to start.")
+            await query.edit_message_text(f"🚀 Attack Started on `{phone}`!" if success else "Failed")
         db.clear_attack_data(uid)
 
-    elif data == "cancel_attack":
+    elif data == "cancel":
         db.clear_attack_data(uid)
-        await query.edit_message_text("Cancelled.")
+        await query.edit_message_text("❌ Cancelled")
 
-# =========================================
-# WEB SERVER
-# =========================================
-async def start_web_server():
+# ========================= WEB SERVER =========================
+async def web_server():
     async def handle(request):
         return web.Response(text="Bot is Alive! 🚀")
     app = web.Application()
@@ -174,11 +150,9 @@ async def start_web_server():
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', PORT)
     await site.start()
-    logger.info(f"Web Server running on port {PORT}")
+    logger.info(f"🌐 Web server started on port {PORT}")
 
-# =========================================
-# MAIN
-# =========================================
+# ========================= MAIN (Clean v20+ way) =========================
 async def main():
     application = Application.builder().token(BOT_TOKEN).build()
 
@@ -186,22 +160,19 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_msg))
     application.add_handler(CallbackQueryHandler(btn_handler))
 
-    asyncio.create_task(start_web_server())
+    asyncio.create_task(web_server())
 
-    logger.info("Starting Bot...")
+    logger.info("✅ Bot is starting...")
     await application.initialize()
     await application.start()
-    await application.updater.start_polling(drop_pending_updates=True)   # Fixed way
 
-    logger.info("✅ Bot is running!")
-    try:
-        await asyncio.Future()   # run forever
-    finally:
-        await application.stop()
+    # Correct & Stable way for v20.7
+    await application.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
-    print("="*60)
+    print("=" * 70)
     print("🔥 PREMIUM BOMBER Starting on Render")
-    print(f"📊 APIs: {len(APIS)} | PORT: {PORT}")
-    print("="*60)
+    print(f"📊 APIs Loaded: {len(APIS)}")
+    print(f"🌐 PORT: {PORT}")
+    print("=" * 70)
     asyncio.run(main())
