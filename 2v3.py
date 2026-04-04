@@ -16,7 +16,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 # =========================================
 # ⚙️ CONFIGURATION
 # =========================================
-BOT_TOKEN = "BOT TOKEN ADD" 
+BOT_TOKEN = "8016499618:AAFuMAsws27GBEnOGpufm1vI4UeBfE7yAf4" 
 OWNER_ID = 6684734209
 
 # 🖼️ WALLPAPER
