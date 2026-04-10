@@ -700,9 +700,7 @@ bot.launch().then(() => {
   console.error('Failed to launch bot:', err);
 });
 //
-process.on("unhandledRejection", (err) => {
-  console.log("Unhandled Error:", err.message);
-});
+process.on("unhandledRejection", () => {});
 
 //
 
